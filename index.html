@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Code Type Practice</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Code Type</h1>
+          <p>Fast, focused code typing practice.</p>
+        </div>
+        <button class="icon-button" id="restartBtn" type="button" title="Restart test" aria-label="Restart test"></button>
+      </header>
+
+      <section class="controls" aria-label="Typing controls">
+        <label class="control-item">
+          <span>Language</span>
+          <select id="languageSelect"></select>
+        </label>
+        <label class="control-item">
+          <span>Mode</span>
+          <select id="practiceModeSelect">
+            <option value="all" selected>all</option>
+            <option value="algorithms">algs + ds</option>
+          </select>
+        </label>
+        <label class="control-item">
+          <span>Time</span>
+          <select id="durationSelect">
+            <option value="0" selected>untimed</option>
+            <option value="15">15s</option>
+            <option value="30">30s</option>
+            <option value="60">60s</option>
+            <option value="120">120s</option>
+          </select>
+        </label>
+        <label class="control-item">
+          <span>Lines</span>
+          <select id="lineModeSelect">
+            <option value="all" selected>full</option>
+            <option value="5">5 lines</option>
+            <option value="3">3 lines</option>
+          </select>
+        </label>
+        <label class="toggle-control">
+          <input id="punctuationToggle" type="checkbox" checked>
+          <span>Punctuation</span>
+        </label>
+      </section>
+
+      <section class="stats" aria-label="Typing stats" hidden>
+        <div>
+          <span class="stat-label">wpm</span>
+          <strong id="wpmStat">0</strong>
+        </div>
+        <div>
+          <span class="stat-label">accuracy</span>
+          <strong id="accuracyStat">100%</strong>
+        </div>
+        <div>
+          <span class="stat-label">time</span>
+          <strong id="timeStat">30</strong>
+        </div>
+        <div>
+          <span class="stat-label">errors</span>
+          <strong id="errorStat">0</strong>
+        </div>
+      </section>
+
+      <section class="typing-panel">
+        <div class="snippet-viewport" id="snippetViewport">
+          <pre id="snippetDisplay" class="snippet-display" aria-label="Code snippet"></pre>
+          <div class="typing-caret" id="typingCaret" aria-hidden="true"></div>
+        </div>
+        <textarea
+          id="typingInput"
+          class="typing-input"
+          spellcheck="false"
+          autocomplete="off"
+          autocapitalize="off"
+          aria-label="Type the code snippet here"
+        ></textarea>
+        <section class="result-panel" id="resultPanel" hidden>
+          <div>
+            <h2>Result</h2>
+            <p id="resultText"></p>
+          </div>
+          <div class="result-stats" id="resultStats" aria-label="Result stats"></div>
+          <button id="nextBtn" type="button">Next snippet</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="data/core.js"></script>
+    <script src="data/c.js"></script>
+    <script src="data/csharp.js"></script>
+    <script src="data/cpp.js"></script>
+    <script src="data/css.js"></script>
+    <script src="data/go.js"></script>
+    <script src="data/html.js"></script>
+    <script src="data/javascript.js"></script>
+    <script src="data/python.js"></script>
+    <script src="data/rust.js"></script>
+    <script src="data/sql.js"></script>
+    <script src="data/typescript.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
