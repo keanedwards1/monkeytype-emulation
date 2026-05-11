@@ -190,6 +190,8 @@ const typingCaret = document.querySelector("#typingCaret");
 const typingInput = document.querySelector("#typingInput");
 const restartBtn = document.querySelector("#restartBtn");
 const nextBtn = document.querySelector("#nextBtn");
+const practiceNextBtn = document.querySelector("#practiceNextBtn");
+const practiceActions = document.querySelector("#practiceActions");
 const resultPanel = document.querySelector("#resultPanel");
 const resultText = document.querySelector("#resultText");
 const resultStats = document.querySelector("#resultStats");
@@ -467,6 +469,7 @@ function finishTest(advanceAfterFinish = false) {
 
   resultText.textContent = `${state.snippet.language} - ${state.snippet.title}`;
   resultPanel.hidden = false;
+  practiceActions.hidden = true;
 
   if (advanceAfterFinish) {
     state.autoAdvanceId = setTimeout(() => {
@@ -511,6 +514,7 @@ function resetTest(focusInput = true) {
   typingInput.disabled = false;
   typingCaret.hidden = false;
   resultPanel.hidden = true;
+  practiceActions.hidden = false;
   renderSnippet();
   renderStats();
 
@@ -570,6 +574,7 @@ lineModeSelect.addEventListener("change", () => resetTest());
 punctuationToggle.addEventListener("change", () => resetTest());
 restartBtn.addEventListener("click", () => resetTest());
 nextBtn.addEventListener("click", moveToNextSnippet);
+practiceNextBtn.addEventListener("click", moveToNextSnippet);
 
 document.addEventListener("keydown", (event) => {
   if (!resultPanel.hidden && event.key === "Tab") {

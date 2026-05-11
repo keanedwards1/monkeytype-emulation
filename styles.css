@@ -389,6 +389,26 @@ body.is-typing .controls:hover {
   line-height: 1;
 }
 
+.practice-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.practice-actions[hidden] {
+  display: none;
+}
+
+.practice-actions button {
+  color: var(--muted);
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.practice-actions button:hover {
+  color: var(--accent);
+}
+
 @media (max-width: 780px) {
   .app-shell {
     width: min(100vw - 20px, 680px);
