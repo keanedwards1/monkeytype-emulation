@@ -13,7 +13,21 @@
           <h1>Code Type</h1>
           <p>Fast, focused code typing practice.</p>
         </div>
-        <button class="icon-button" id="restartBtn" type="button" title="Restart test" aria-label="Restart test"></button>
+        <button
+          class="icon-button"
+          id="restartBtn"
+          type="button"
+          title="Restart snippet"
+          aria-label="Restart snippet"
+        >
+          <svg class="restart-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+            <path d="M3 2v6h6"></path>
+            <path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path>
+            <path d="M21 22v-6h-6"></path>
+            <path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
+          </svg>
+          <span class="button-tooltip" role="tooltip">Restart snippet</span>
+        </button>
       </header>
 
       <section class="controls" aria-label="Typing controls">
@@ -29,6 +43,15 @@
           </select>
         </label>
         <label class="control-item">
+          <span>Length</span>
+          <select id="lengthSelect">
+            <option value="all">all</option>
+            <option value="short" selected>short</option>
+            <option value="medium">medium</option>
+            <option value="long">long</option>
+          </select>
+        </label>
+        <label class="control-item">
           <span>Time</span>
           <select id="durationSelect">
             <option value="0" selected>untimed</option>
@@ -41,14 +64,20 @@
         <label class="control-item">
           <span>Lines</span>
           <select id="lineModeSelect">
-            <option value="all" selected>full</option>
+            <option value="all">full</option>
             <option value="5">5 lines</option>
-            <option value="3">3 lines</option>
+            <option value="3" selected>3 lines</option>
           </select>
         </label>
         <label class="toggle-control">
           <input id="punctuationToggle" type="checkbox" checked>
+          <span class="toggle-slider" aria-hidden="true"></span>
           <span>Punctuation</span>
+        </label>
+        <label class="toggle-control">
+          <input id="randomLanguageToggle" type="checkbox" checked>
+          <span class="toggle-slider" aria-hidden="true"></span>
+          <span>Random language on reload</span>
         </label>
       </section>
 
@@ -85,16 +114,34 @@
           aria-label="Type the code snippet here"
         ></textarea>
         <section class="result-panel" id="resultPanel" hidden>
-          <div>
-            <h2>Result</h2>
-            <p id="resultText"></p>
+          <div class="result-header">
+            <div>
+              <h2>Result</h2>
+              <p id="resultText"></p>
+            </div>
           </div>
           <div class="result-stats" id="resultStats" aria-label="Result stats"></div>
-          <button id="nextBtn" type="button">Next snippet</button>
+          <div class="result-chart" id="resultChart" aria-label="Typing speed chart"></div>
+          <div class="result-details" id="resultDetails" aria-label="Result details"></div>
+          <div class="result-actions">
+            <button class="icon-button next-icon-button" id="nextBtn" type="button" title="Next snippet" aria-label="Next snippet">
+              <svg class="next-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+              <span class="button-tooltip" role="tooltip">Next snippet</span>
+            </button>
+          </div>
         </section>
       </section>
       <div class="practice-actions" id="practiceActions">
-        <button id="practiceNextBtn" type="button">Next snippet</button>
+        <button class="icon-button next-icon-button" id="practiceNextBtn" type="button" title="Next snippet" aria-label="Next snippet">
+          <svg class="next-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14"></path>
+            <path d="m13 6 6 6-6 6"></path>
+          </svg>
+          <span class="button-tooltip" role="tooltip">Next snippet</span>
+        </button>
       </div>
     </main>
 

@@ -165,6 +165,17 @@ order by last_order_at desc;`
   }
 ];
 
+function shuffleItems(items) {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [items[index], items[randomIndex]] = [items[randomIndex], items[index]];
+  }
+
+  return items;
+}
+
+shuffleItems(snippets);
+
 const state = {
   snippet: snippets[0],
   typed: "",
@@ -176,14 +187,21 @@ const state = {
   startedAt: null,
   autoAdvanceId: null,
   lineHeight: 52.8,
-  firstVisibleLine: 0
+  firstVisibleLine: 0,
+  horizontalOffset: 0,
+  samples: [],
+  recentSnippets: [],
+  snippetQueue: [],
+  snippetQueueKey: ""
 };
 
 const languageSelect = document.querySelector("#languageSelect");
 const practiceModeSelect = document.querySelector("#practiceModeSelect");
+const lengthSelect = document.querySelector("#lengthSelect");
 const durationSelect = document.querySelector("#durationSelect");
 const lineModeSelect = document.querySelector("#lineModeSelect");
 const punctuationToggle = document.querySelector("#punctuationToggle");
+const randomLanguageToggle = document.querySelector("#randomLanguageToggle");
 const snippetViewport = document.querySelector("#snippetViewport");
 const snippetDisplay = document.querySelector("#snippetDisplay");
 const typingCaret = document.querySelector("#typingCaret");
@@ -192,16 +210,34 @@ const restartBtn = document.querySelector("#restartBtn");
 const nextBtn = document.querySelector("#nextBtn");
 const practiceNextBtn = document.querySelector("#practiceNextBtn");
 const practiceActions = document.querySelector("#practiceActions");
+const resultActions = document.querySelector(".result-actions");
 const resultPanel = document.querySelector("#resultPanel");
 const resultText = document.querySelector("#resultText");
 const resultStats = document.querySelector("#resultStats");
+const resultChart = document.querySelector("#resultChart");
+const resultDetails = document.querySelector("#resultDetails");
 const wpmStat = document.querySelector("#wpmStat");
 const accuracyStat = document.querySelector("#accuracyStat");
 const timeStat = document.querySelector("#timeStat");
 const errorStat = document.querySelector("#errorStat");
+const LANGUAGE_RELOAD_MODE_KEY = "codeType.languageReloadMode";
+const SAVED_LANGUAGE_KEY = "codeType.savedLanguage";
+const lengthBreakpointsByLanguage = snippets.reduce((breakpoints, snippet) => {
+  breakpoints[snippet.language] ??= [];
+  breakpoints[snippet.language].push(snippet.code.length);
+  return breakpoints;
+}, {});
+
+for (const [language, lengths] of Object.entries(lengthBreakpointsByLanguage)) {
+  lengths.sort((left, right) => left - right);
+  lengthBreakpointsByLanguage[language] = {
+    shortMax: lengths[Math.floor(lengths.length / 3)] ?? 0,
+    mediumMax: lengths[Math.floor((lengths.length * 2) / 3)] ?? Infinity
+  };
+}
 
 function uniqueLanguages() {
-  return [...new Set(snippetsForMode().map((snippet) => snippet.language))].sort();
+  return [...new Set(snippetsForFilters().map((snippet) => snippet.language))].sort();
 }
 
 function snippetsForMode() {
@@ -210,6 +246,46 @@ function snippetsForMode() {
   }
 
   return snippets.filter((snippet) => snippet.category === practiceModeSelect.value);
+}
+
+function snippetLengthCategory(snippet) {
+  const breakpoints = lengthBreakpointsByLanguage[snippet.language];
+
+  if (snippet.code.length <= breakpoints.shortMax) {
+    return "short";
+  }
+
+  if (snippet.code.length <= breakpoints.mediumMax) {
+    return "medium";
+  }
+
+  return "long";
+}
+
+function snippetsForFilters() {
+  const modeSnippets = snippetsForMode();
+
+  if (lengthSelect.value === "all") {
+    return modeSnippets;
+  }
+
+  return modeSnippets.filter((snippet) => snippetLengthCategory(snippet) === lengthSelect.value);
+}
+
+function loadSetting(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function saveSetting(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures so private browsing still works normally.
+  }
 }
 
 function codeForPractice(snippet = state.snippet) {
@@ -241,29 +317,122 @@ function populateLanguages() {
   }
 }
 
+function selectRandomLanguage() {
+  const options = [...languageSelect.options];
+
+  if (options.length === 0) {
+    return;
+  }
+
+  languageSelect.value = options[Math.floor(Math.random() * options.length)].value;
+}
+
+function restoreSavedLanguage() {
+  const savedLanguage = loadSetting(SAVED_LANGUAGE_KEY);
+  const option = [...languageSelect.options].find((item) => item.value === savedLanguage);
+
+  if (!option) {
+    return false;
+  }
+
+  languageSelect.value = option.value;
+  return true;
+}
+
 function populateSnippets() {
-  selectRandomSnippet();
+  startShuffledSnippetPlaylist();
 }
 
 function snippetsForCurrentLanguage() {
-  return snippetsForMode().filter((snippet) => snippet.language === languageSelect.value);
+  return snippetsForFilters().filter((snippet) => snippet.language === languageSelect.value);
+}
+
+function shuffledSnippetQueue(snippetPool) {
+  return shuffleItems([...snippetPool]);
+}
+
+function selectRandomAvailableSnippet() {
+  const choices = snippetsForFilters();
+
+  if (choices.length === 0) {
+    return false;
+  }
+
+  const snippet = choices[Math.floor(Math.random() * choices.length)];
+  languageSelect.value = snippet.language;
+  selectSnippet(snippet);
+
+  state.snippetQueueKey = currentSnippetQueueKey();
+  state.snippetQueue = shuffledSnippetQueue(snippetsForCurrentLanguage())
+    .filter((item) => item !== snippet);
+
+  return true;
+}
+
+function initializeLanguagePreference() {
+  const reloadMode = loadSetting(LANGUAGE_RELOAD_MODE_KEY);
+  randomLanguageToggle.checked = reloadMode !== "same";
+  let selectedSnippet = false;
+
+  if (randomLanguageToggle.checked || !restoreSavedLanguage()) {
+    selectedSnippet = selectRandomAvailableSnippet();
+  }
+
+  saveSetting(SAVED_LANGUAGE_KEY, languageSelect.value);
+  return selectedSnippet;
+}
+
+function currentSnippetQueueKey() {
+  return [
+    languageSelect.value,
+    practiceModeSelect.value,
+    lengthSelect.value
+  ].join("|");
 }
 
 function selectSnippet(snippet) {
   state.snippet = snippet;
+  state.recentSnippets = [snippet, ...state.recentSnippets.filter((item) => item !== snippet)].slice(0, 4);
+}
+
+function resetSnippetQueue() {
+  state.snippetQueue = [];
+  state.snippetQueueKey = "";
+}
+
+function startShuffledSnippetPlaylist() {
+  const languageSnippets = snippetsForCurrentLanguage();
+
+  if (languageSnippets.length === 0) {
+    return;
+  }
+
+  const queue = shuffledSnippetQueue(languageSnippets);
+  const first = queue.shift();
+
+  selectSnippet(first);
+  state.snippetQueue = queue;
+  state.snippetQueueKey = currentSnippetQueueKey();
 }
 
 function selectRandomSnippet() {
   const languageSnippets = snippetsForCurrentLanguage();
-  const choices = languageSnippets.filter((snippet) => snippet !== state.snippet);
-  const pool = choices.length > 0 ? choices : languageSnippets;
-  const randomIndex = Math.floor(Math.random() * pool.length);
+  const queueKey = currentSnippetQueueKey();
 
-  if (pool.length === 0) {
+  if (languageSnippets.length === 0) {
     return;
   }
 
-  selectSnippet(pool[randomIndex]);
+  if (state.snippetQueueKey !== queueKey || state.snippetQueue.length === 0) {
+    state.snippetQueue = shuffledSnippetQueue(languageSnippets);
+    state.snippetQueueKey = queueKey;
+  }
+
+  if (state.snippetQueue[0] === state.snippet && state.snippetQueue.length > 1) {
+    state.snippetQueue.push(state.snippetQueue.shift());
+  }
+
+  selectSnippet(state.snippetQueue.shift());
 }
 
 function escapeHtml(character) {
@@ -292,9 +461,14 @@ function syncSnippetViewport() {
   const firstVisibleLine = Number.isFinite(visibleLines)
     ? Math.max(0, Math.min(activeLine - Math.floor(visibleLines / 2), totalLines - visibleLines))
     : 0;
+  const linesBelow = Number.isFinite(visibleLines)
+    ? Math.max(0, totalLines - firstVisibleLine - viewportLines)
+    : 0;
+  const hasMoreBelow = linesBelow > 0;
 
   snippetViewport.style.setProperty("--visible-lines", String(viewportLines));
   snippetViewport.dataset.firstVisibleLine = String(firstVisibleLine);
+  snippetViewport.dataset.moreBelow = String(hasMoreBelow);
   snippetDisplay.style.transform = "translateY(0)";
 
   return { firstVisibleLine, viewportLines };
@@ -324,6 +498,23 @@ function syncCaret() {
 
   const viewportRect = snippetViewport.getBoundingClientRect();
   const currentRect = current.getBoundingClientRect();
+  const gutter = 32;
+  let nextOffset = state.horizontalOffset;
+  const currentLeft = currentRect.left - viewportRect.left;
+  const currentRight = currentRect.right - viewportRect.left;
+
+  if (currentRight > viewportRect.width - gutter) {
+    nextOffset += currentRight - (viewportRect.width - gutter);
+  } else if (currentLeft < gutter) {
+    nextOffset = Math.max(0, nextOffset - (gutter - currentLeft));
+  }
+
+  if (Math.abs(nextOffset - state.horizontalOffset) > 0.5) {
+    state.horizontalOffset = nextOffset;
+    snippetViewport.style.setProperty("--x-offset", `${nextOffset}px`);
+    requestAnimationFrame(syncCaret);
+    return;
+  }
 
   typingCaret.hidden = false;
   typingCaret.style.left = `${currentRect.left - viewportRect.left - 1}px`;
@@ -339,6 +530,7 @@ function renderSnippet() {
   const isLineChange = lineDelta !== 0;
   const ranges = lineRanges(target);
   const visibleRanges = ranges.slice(firstVisibleLine, firstVisibleLine + viewportLines);
+  const nextRange = ranges[firstVisibleLine + viewportLines];
   let markup = "";
 
   for (const range of visibleRanges) {
@@ -356,7 +548,7 @@ function renderSnippet() {
       } else if (actual === expected) {
         className = "typed";
       } else {
-        className = "wrong";
+        className = expected === " " || expected === "\t" ? "wrong-empty" : "wrong";
       }
 
       currentLine += className
@@ -364,11 +556,25 @@ function renderSnippet() {
         : escapeHtml(expected);
     }
 
+    if (target[range.end] === "\n" && typed[range.end] != null && typed[range.end] !== "\n") {
+      currentLine += `<span class="wrong-empty wrong-empty-eol"></span>`;
+    }
+
     if (typed.length === range.end && !state.finished) {
       currentLine += `<span class="current cursor-anchor"></span>`;
     }
 
     markup += `<span class="snippet-line">${currentLine}</span>`;
+  }
+
+  if (nextRange) {
+    const nextLine = target
+      .slice(nextRange.start, nextRange.end)
+      .split("")
+      .map(escapeHtml)
+      .join("");
+
+    markup += `<span class="snippet-next-line" aria-hidden="true">${nextLine}</span>`;
   }
 
   if (isLineChange) {
@@ -423,9 +629,34 @@ function calculateStats() {
   const errors = countErrors();
   const correctChars = Math.max(0, typedChars - errors);
   const wpm = Math.round((correctChars / 5) / (elapsedSeconds / 60));
+  const rawWpm = Math.round((typedChars / 5) / (elapsedSeconds / 60));
   const accuracy = typedChars === 0 ? 100 : Math.round((correctChars / typedChars) * 100);
 
-  return { wpm, accuracy, errors, elapsedSeconds: Math.round(elapsedSeconds) };
+  return {
+    wpm,
+    rawWpm,
+    accuracy,
+    errors,
+    correctChars,
+    typedChars,
+    elapsedSeconds: Math.round(elapsedSeconds)
+  };
+}
+
+function recordSample() {
+  if (!state.startedAt) {
+    return;
+  }
+
+  const { wpm, rawWpm, accuracy, errors, elapsedSeconds } = calculateStats();
+  const lastSample = state.samples[state.samples.length - 1];
+
+  if (lastSample && lastSample.time === elapsedSeconds) {
+    state.samples[state.samples.length - 1] = { time: elapsedSeconds, wpm, rawWpm, accuracy, errors };
+    return;
+  }
+
+  state.samples.push({ time: elapsedSeconds, wpm, rawWpm, accuracy, errors });
 }
 
 function renderStats() {
@@ -441,17 +672,78 @@ function renderStats() {
   document.body.classList.toggle("is-typing", state.started && !state.finished);
 }
 
+function consistencyFromSamples() {
+  const values = state.samples.map((sample) => sample.wpm).filter((value) => value > 0);
+
+  if (values.length < 2) {
+    return 100;
+  }
+
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + ((value - average) ** 2), 0) / values.length;
+  const standardDeviation = Math.sqrt(variance);
+
+  return Math.max(0, Math.round(100 - ((standardDeviation / Math.max(average, 1)) * 100)));
+}
+
 function renderResultStats() {
-  const { wpm, accuracy, errors, elapsedSeconds } = calculateStats();
+  const { wpm, rawWpm, accuracy, errors, elapsedSeconds } = calculateStats();
   const stats = [
     ["wpm", wpm],
+    ["raw", rawWpm],
     ["accuracy", `${accuracy}%`],
-    ["time", `${elapsedSeconds}s`],
-    ["errors", errors]
+    ["time", `${elapsedSeconds}s`]
   ];
 
   resultStats.innerHTML = stats
     .map(([label, value]) => `<div class="result-stat"><span>${label}</span><strong>${value}</strong></div>`)
+    .join("");
+}
+
+function renderResultChart() {
+  const samples = state.samples.length > 0
+    ? state.samples
+    : [{ time: 0, wpm: 0, rawWpm: 0, accuracy: 100, errors: 0 }];
+  const width = 720;
+  const height = 220;
+  const padding = 28;
+  const maxTime = Math.max(...samples.map((sample) => sample.time), 1);
+  const maxWpm = Math.max(...samples.map((sample) => sample.rawWpm), ...samples.map((sample) => sample.wpm), 10);
+  const scaleX = (time) => padding + ((time / maxTime) * (width - padding * 2));
+  const scaleY = (wpm) => height - padding - ((wpm / maxWpm) * (height - padding * 2));
+  const pathFor = (key) => samples
+    .map((sample, index) => `${index === 0 ? "M" : "L"} ${scaleX(sample.time).toFixed(1)} ${scaleY(sample[key]).toFixed(1)}`)
+    .join(" ");
+
+  resultChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="WPM over time">
+      <line class="chart-axis" x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"></line>
+      <line class="chart-axis" x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}"></line>
+      <path class="chart-line chart-raw" d="${pathFor("rawWpm")}"></path>
+      <path class="chart-line chart-wpm" d="${pathFor("wpm")}"></path>
+      ${samples.map((sample) => `<circle class="chart-dot" cx="${scaleX(sample.time).toFixed(1)}" cy="${scaleY(sample.wpm).toFixed(1)}" r="3"></circle>`).join("")}
+    </svg>
+    <div class="chart-legend">
+      <span><i class="legend-wpm"></i>wpm</span>
+      <span><i class="legend-raw"></i>raw</span>
+    </div>
+  `;
+}
+
+function renderResultDetails() {
+  const { correctChars, typedChars, errors } = calculateStats();
+  const target = codeForPractice();
+  const details = [
+    ["characters", `${correctChars}/${typedChars}/${target.length}`],
+    ["incorrect", errors],
+    ["consistency", `${consistencyFromSamples()}%`],
+    ["mode", practiceModeSelect.options[practiceModeSelect.selectedIndex].textContent],
+    ["language", state.snippet.language],
+    ["snippet", state.snippet.title]
+  ];
+
+  resultDetails.innerHTML = details
+    .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
     .join("");
 }
 
@@ -463,9 +755,12 @@ function finishTest(advanceAfterFinish = false) {
   state.finished = true;
   clearInterval(state.timerId);
   typingInput.disabled = true;
+  recordSample();
   renderSnippet();
   renderStats();
   renderResultStats();
+  renderResultChart();
+  renderResultDetails();
 
   resultText.textContent = `${state.snippet.language} - ${state.snippet.title}`;
   resultPanel.hidden = false;
@@ -484,12 +779,16 @@ function startTimer() {
   state.startedAt = Date.now();
 
   if (state.duration === 0) {
-    state.timerId = setInterval(renderStats, 1000);
+    state.timerId = setInterval(() => {
+      recordSample();
+      renderStats();
+    }, 1000);
     return;
   }
 
   state.timerId = setInterval(() => {
     state.remaining -= 1;
+    recordSample();
     renderStats();
 
     if (state.remaining <= 0) {
@@ -510,6 +809,9 @@ function resetTest(focusInput = true) {
   state.startedAt = null;
   state.autoAdvanceId = null;
   state.firstVisibleLine = 0;
+  state.horizontalOffset = 0;
+  state.samples = [];
+  snippetViewport.style.setProperty("--x-offset", "0px");
   typingInput.value = "";
   typingInput.disabled = false;
   typingCaret.hidden = false;
@@ -525,14 +827,16 @@ function resetTest(focusInput = true) {
 
 function shouldCaptureTyping(event) {
   const activeElement = document.activeElement;
-  const isEditable = activeElement?.matches?.("input, textarea, select, button, [contenteditable='true']");
+  const isControl = activeElement?.matches?.("select, input[type='checkbox'], input[type='radio'], [contenteditable='true']");
+  const isTextField = activeElement?.matches?.("input:not([type]), input[type='text'], input[type='search'], textarea");
 
   return !event.ctrlKey
     && !event.metaKey
     && !event.altKey
     && event.key.length === 1
     && activeElement !== typingInput
-    && !isEditable
+    && !isControl
+    && !isTextField
     && !state.finished;
 }
 
@@ -550,6 +854,7 @@ typingInput.addEventListener("input", () => {
 
   state.typed = typingInput.value.slice(0, target.length);
   typingInput.value = state.typed;
+  recordSample();
   renderSnippet();
   renderStats();
 
@@ -559,12 +864,24 @@ typingInput.addEventListener("input", () => {
 });
 
 languageSelect.addEventListener("change", () => {
+  saveSetting(SAVED_LANGUAGE_KEY, languageSelect.value);
+  resetSnippetQueue();
   populateSnippets();
   resetTest();
 });
 
 practiceModeSelect.addEventListener("change", () => {
   populateLanguages();
+  saveSetting(SAVED_LANGUAGE_KEY, languageSelect.value);
+  resetSnippetQueue();
+  populateSnippets();
+  resetTest();
+});
+
+lengthSelect.addEventListener("change", () => {
+  populateLanguages();
+  saveSetting(SAVED_LANGUAGE_KEY, languageSelect.value);
+  resetSnippetQueue();
   populateSnippets();
   resetTest();
 });
@@ -572,9 +889,21 @@ practiceModeSelect.addEventListener("change", () => {
 durationSelect.addEventListener("change", () => resetTest());
 lineModeSelect.addEventListener("change", () => resetTest());
 punctuationToggle.addEventListener("change", () => resetTest());
+randomLanguageToggle.addEventListener("change", () => {
+  saveSetting(LANGUAGE_RELOAD_MODE_KEY, randomLanguageToggle.checked ? "random" : "same");
+  saveSetting(SAVED_LANGUAGE_KEY, languageSelect.value);
+});
 restartBtn.addEventListener("click", () => resetTest());
-nextBtn.addEventListener("click", moveToNextSnippet);
-practiceNextBtn.addEventListener("click", moveToNextSnippet);
+resultActions.addEventListener("click", (event) => {
+  if (event.target.closest("#nextBtn")) {
+    moveToNextSnippet();
+  }
+});
+practiceActions.addEventListener("click", (event) => {
+  if (event.target.closest("#practiceNextBtn")) {
+    moveToNextSnippet();
+  }
+});
 
 document.addEventListener("keydown", (event) => {
   if (!resultPanel.hidden && event.key === "Tab") {
@@ -621,7 +950,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 populateLanguages();
-populateSnippets();
+if (!initializeLanguagePreference()) {
+  resetSnippetQueue();
+  populateSnippets();
+}
 syncLineHeight();
 resetTest(false);
 
