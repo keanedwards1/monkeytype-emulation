@@ -498,26 +498,31 @@ function syncCaret() {
 
   const viewportRect = snippetViewport.getBoundingClientRect();
   const currentRect = current.getBoundingClientRect();
-  const gutter = 32;
-  let nextOffset = state.horizontalOffset;
-  const currentLeft = currentRect.left - viewportRect.left;
-  const currentRight = currentRect.right - viewportRect.left;
+  const currentLine = current.closest(".snippet-line");
+  let nextOffset = 0;
+  let caretLeft = currentRect.left - viewportRect.left - 1;
 
-  if (currentRight > viewportRect.width - gutter) {
-    nextOffset += currentRight - (viewportRect.width - gutter);
-  } else if (currentLeft < gutter) {
-    nextOffset = Math.max(0, nextOffset - (gutter - currentLeft));
+  if (currentLine) {
+    const lineWidth = currentLine.scrollWidth;
+    const viewportWidth = viewportRect.width;
+    const maxOffset = Math.max(0, lineWidth - viewportWidth);
+    const cursorXInLine = current.offsetLeft;
+
+    if (maxOffset > 0) {
+      const thirdRegionStart = viewportWidth * (2 / 3);
+      nextOffset = Math.max(0, Math.min(cursorXInLine - thirdRegionStart, maxOffset));
+    }
+
+    caretLeft = cursorXInLine - nextOffset - 1;
   }
 
   if (Math.abs(nextOffset - state.horizontalOffset) > 0.5) {
     state.horizontalOffset = nextOffset;
     snippetViewport.style.setProperty("--x-offset", `${nextOffset}px`);
-    requestAnimationFrame(syncCaret);
-    return;
   }
 
   typingCaret.hidden = false;
-  typingCaret.style.left = `${currentRect.left - viewportRect.left - 1}px`;
+  typingCaret.style.left = `${caretLeft}px`;
   typingCaret.style.top = `${currentRect.top - viewportRect.top + currentRect.height * 0.12}px`;
   typingCaret.style.height = `${currentRect.height * 0.76}px`;
 }
